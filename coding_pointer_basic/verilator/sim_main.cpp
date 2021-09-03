@@ -56,23 +56,31 @@ int main(int argc, char** argv, char** env) {
     top->d_i_ap_vld = 0;
     top->d_i_ap_ack = 0;
     top->d_o_ap_ack = 0;
-
     dio_t data_d = 0x1234;
+
+    bool ap_done_to_tb = false;
+    bool ap_idle_to_tb;
+    bool ap_ready_to_tb;
+    bool d_i_ap_ack_to_tb;
+    unsigned d_o_to_tb;
+    bool d_o_ap_vld_to_tb;
+
+
 
     while (true)  {
         main_time++;  // Time passes...
 
-        // Toggle a fast (time/2 period) clock
-
+        // Toggle a fast (time/2 period) clock        
         top->ap_clk = main_time & 0x1;
+
         // Toggle control signals on an edge that doesn't correspond
         // to where the controls are sampled
-        if (!top->ap_clk && main_time > 1000) {
+        if (!top->ap_clk && main_time > 500) {
          break;
         }
 
         if (!top->ap_clk ) {
-          if (main_time == 100 || main_time == 200 || main_time == 300 || main_time == 400 || main_time == 500) {
+          if (main_time == 20 || ap_done_to_tb) {
               top->ap_rst     = 0;
               top->ap_start   = 1;
               top->d_i_ap_vld = 1;
@@ -80,7 +88,10 @@ int main(int argc, char** argv, char** env) {
               VL_PRINTF("Din: %x \r\n", data_d);
               pointer_basic(&data_d);
               VL_PRINTF("Dout: %x \r\n", data_d);
-          }          
+          } else if (top->d_i_ap_vld && d_i_ap_ack_to_tb) {              
+              top->d_i_ap_vld = 0;          
+              top->ap_start   = 0;
+          }             
         }
         
 
@@ -88,27 +99,30 @@ int main(int argc, char** argv, char** env) {
           top->d_o_ap_ack = (((main_time >> 1) % 10) == 0);
         }
 
-        //Sampling before the EVAL
-
         // Evaluate model
         // (If you have multiple models being simulated in the same
         // timestep then instead of eval(), call eval_step() on each, then
         // eval_end_step() on each.)
         top->eval();
 
-        if (!top->ap_clk )
-          if (top->d_o_ap_vld && top->d_o_ap_ack) {                                                
-            VL_PRINTF("Checking against C function output %s\r\n", (top->d_o == data_d)?"OK":"ERROR");
+        //Checking on rising edge
+        if (top->ap_clk )
+          if (d_o_ap_vld_to_tb && top->d_o_ap_ack) {                                                
+            VL_PRINTF("Checking against C function output %s (%x vs %x) \r\n", (d_o_to_tb == data_d)?"OK":"ERROR", d_o_to_tb, data_d);
           }
 
+
+        //Sampling on falling edge after eval
         if (!top->ap_clk) {
-          if (top->d_i_ap_vld && top->d_i_ap_ack) {              
-              top->d_i_ap_vld = 0;
-          }          
+          ap_done_to_tb  = top->ap_done;
+          ap_ready_to_tb = top->ap_ready;
+          ap_idle_to_tb  = top->ap_idle;
+          d_i_ap_ack_to_tb  = top->d_i_ap_ack;
+          d_o_ap_vld_to_tb  = top->d_o_ap_vld;
+          d_o_to_tb         = top->d_o;
         }
-        
-        // Read outputs
-        //VL_PRINTF("[%" VL_PRI64 "d] clk=%x ");
+
+
     }
     // Final model cleanup
     top->final();
