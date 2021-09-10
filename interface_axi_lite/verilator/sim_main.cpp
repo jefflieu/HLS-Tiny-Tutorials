@@ -57,9 +57,6 @@ int main(int argc, char** argv, char** env) {
     AxiLite32M2S axi_driver_to_dut;
     AxiLite32S2M axi_dut_to_driver;
 
-    memset(&axi_driver_to_dut, 0, sizeof(axi_driver_to_dut));
-    memset(&axi_dut_to_driver, 0, sizeof(axi_dut_to_driver));
-
 
     while (true)  {
         main_time++;  // Time passes...
