@@ -35,7 +35,7 @@ endif()
 
 
 add_executable(sim sim_main.cpp ../example.cpp)
-include_directories(../ $ENV{VERILATOR_TB}/src)
+include_directories(../ $ENV{VERILATOR_TB}/inc)
 
 
 # Add the Verilated circuit to the target
