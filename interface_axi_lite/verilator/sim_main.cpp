@@ -19,9 +19,11 @@ double sc_time_stamp() {
     return main_time;  // Note does conversion to real, to match SystemC
 }
 
-using AxiLite32 = AxiLiteDriver<uint32_t, uint32_t>;
-using AxiLite32M2S = AxiLiteM2S<uint32_t, uint32_t>;
-using AxiLite32S2M = AxiLiteS2M<uint32_t, uint32_t>;
+
+using AxiLite32    = vtb::AxiLiteDriver<uint32_t, uint32_t>;
+using AxiLite32M2S = vtb::AxiLiteM2S<uint32_t, uint32_t>;
+using AxiLite32S2M = vtb::AxiLiteS2M<uint32_t, uint32_t>;
+using AxiLiteTransaction = vtb::AxiLiteTransaction<uint32_t, uint32_t>;
 
 void example(char *a, char *b, char *c);
 void generateTransaction(AxiLite32* axiliteDriver);

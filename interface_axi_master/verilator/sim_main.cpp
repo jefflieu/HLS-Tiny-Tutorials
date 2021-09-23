@@ -11,6 +11,8 @@
 #include "Vverilator_dut.h"
 #include "AllDrivers.h"
 
+using namespace vtb;
+
 // Current simulation time (64-bit unsigned)
 vluint64_t main_time = 0;
 #define CLOCK_CYCLE (main_time>>1)
