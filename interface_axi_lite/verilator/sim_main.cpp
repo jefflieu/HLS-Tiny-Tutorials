@@ -9,7 +9,7 @@
 #include <cstdlib>
 // Include model header, generated from Verilating "top.v"
 #include "Vverilator_dut.h"
-#include "AllDrivers.h"
+#include "AllVtbHeaders.h"
 
 // Current simulation time (64-bit unsigned)
 vluint64_t main_time = 0;
