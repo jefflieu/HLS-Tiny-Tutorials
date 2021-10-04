@@ -33,6 +33,11 @@ if (NOT EXISTS $ENV{VERILATOR_TB})
   message(FATAL_ERROR "Verilator testbench environment not found. Please download from https://www.github.com/jefflieu/verilator_tb.git and set environment variable VERILATOR_TB to point to it")
 endif()
 
+if (NOT EXISTS $ENV{VITIS_HLS})
+  message (FATAL_ERROR "VITIS_HLS variable doesn't exist")
+else()
+  add_definitions(-DVITIS_HLS)
+endif()
 
 add_executable(sim sim_main.cpp ../example.cpp)
 include_directories(../ $ENV{VERILATOR_TB}/inc)

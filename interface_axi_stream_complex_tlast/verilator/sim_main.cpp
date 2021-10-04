@@ -10,6 +10,7 @@
 // Include model header, generated from Verilating "top.v"
 #include "Vverilator_dut.h"
 #include "AllVtbHeaders.h"
+#include "../example.h"
 
 // Current simulation time (64-bit unsigned)
 vluint64_t main_time = 0;
@@ -20,11 +21,16 @@ double sc_time_stamp() {
 }
 
 using AxiSDriver      = vtb::AxiStreamDriver<uint32_t>;
+using AxiSReceiver    = vtb::AxiStreamReceiver<uint32_t>;
 using AxiSource32     = vtb::AxiStreamSource<uint32_t>;
 using AxiSink32       = vtb::AxiStreamSink;
-using AxiSXfer        = vtb::AxiStreamTransaction;
+using AxiSPacket      = vtb::AxiStreamPacket<uint32_t>;
+using AxiSBeat        = vtb::AxiStreamBeat<uint32_t>;
+using HlsAxiDriver    = vtb::HlsAxiStreamDriver<data_t, uint32_t>;
+using HlsAxiReceiver  = vtb::HlsAxiStreamReceiver<data_t, uint32_t>;
 
-
+uint32_t packData(const data_t & axis_obj) {return ((uint32_t)axis_obj.data.imag() << 16) |  axis_obj.data.real();}
+data_t unpackData(const uint32_t & bus) {data_t ret; ret.data.imag((bus >> 16) & 0xffff); ret.data.real(bus & 0xffff); return ret;}
 
 int main(int argc, char** argv, char** env) {
     // This is a more complicated example, please also see the simpler examples/make_hello_c.
@@ -54,17 +60,33 @@ int main(int argc, char** argv, char** env) {
     Vverilator_dut* top = new Vverilator_dut();  // Or use a const unique_ptr, or the VL_UNIQUE_PTR wrapper
 
     AxiSDriver*   driver = new AxiSDriver("AXI stream driver");
+    AxiSReceiver* receiver = new AxiSReceiver("AXI stream receiver", false);
     AxiSource32   driver_to_dut;
     AxiSink32     dut_to_driver;
 
-    AxiSource32   dut_out_to_driver;
-    AxiSink32     driver_sink_to_dut;
+    AxiSource32   dut_to_receiver;
+    AxiSink32     receiver_to_dut;
+
 
     uint8_t* byte_stream = new uint8_t[1024];
     for(uint32_t i = 0; i < 1024; i++) byte_stream[i] = i;
 
-    AxiSXfer t(AxiSXfer::FROM_BUFFER, byte_stream, 128, 2);
-    driver->pushTransaction(t);
+    //AxiSPacket t(byte_stream, 128, 0);
+    HlsAxiDriver* hls_driver = new HlsAxiDriver(packData, "my hls driver");
+    HlsAxiReceiver* hls_receiver = new HlsAxiReceiver(unpackData, "my hls receiver");
+
+    mystream A, B;
+    // Put data into A Stream
+    for(int i=0; i < SIZE; i++){
+        data_t tmp;
+        tmp.data = {i, i};
+        tmp.last = (i == (SIZE - 1)) ? 1 : 0;
+        hls_driver->write(tmp);
+        A.write(tmp);
+    };
+
+    example(A, B);
+        
 
     while (true)  {
         main_time++;  // Time passes...
@@ -87,19 +109,39 @@ int main(int argc, char** argv, char** env) {
           top->A_TSTRB  = driver_to_dut.tstrb;
           top->A_TLAST  = driver_to_dut.tlast;          
           dut_to_driver.tready = top->A_TREADY;
-          top->B_TREADY = 1;
+          
+
+          dut_to_receiver.tdata  =top->B_TDATA;
+          dut_to_receiver.tvalid =top->B_TVALID;
+          dut_to_receiver.tkeep  =top->B_TKEEP;
+          dut_to_receiver.tstrb  =top->B_TSTRB;
+          dut_to_receiver.tlast  =top->B_TLAST; 
+          top->B_TREADY = receiver_to_dut.tready;
         }
 
         top->eval();
-        driver->eval(main_time, top->ap_clk, (main_time < 100) , driver_to_dut, dut_to_driver);
+        hls_driver->eval(main_time, top->ap_clk, (CLOCK_CYCLE <= 100) , driver_to_dut, dut_to_driver);
+        hls_receiver->eval(main_time, top->ap_clk, (CLOCK_CYCLE <= 100) , dut_to_receiver, receiver_to_dut);
         if (main_time >= 1000) break;
 
     }
     // Final model cleanup
     top->final();
     
-    //VL_PRINTF("Comparing data: %s\r\n", memcmp(ref_buffer, axi_memory->getMemPtr(0), axi_memory->getMemSize(0))==0?"PASSED":"FAILED");
-    
+    VL_PRINTF("Comparing data .. \r\n");
+
+    // Compare the results
+    for(int i=0; i < SIZE; i++){
+      data_t tmp_b = B.read();
+      data_t tmp_c = hls_receiver->read();
+      if (tmp_b.data != tmp_c.data){
+          printf("ERROR HW and SW results mismatch %d %d %d %d\n", tmp_b.data.real(), tmp_b.data.imag(), tmp_c.data.real(), tmp_c.data.imag());
+          return 1;
+      }
+    }
+  
+
+
     //Check    
     VL_PRINTF("Test done\r\n");
 
